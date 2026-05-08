@@ -17,7 +17,7 @@ if not TELEGRAM_TOKEN or not HUGGINGFACE_TOKEN:
     raise ValueError("Укажи TELEGRAM_TOKEN и HUGGINGFACE_TOKEN в файле .env")
 
 # Используем runwayml/stable-diffusion-v1-5
-API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
 
 headers = {
     "Authorization": f"Bearer {HUGGINGFACE_TOKEN}",
