@@ -16,7 +16,8 @@ HUGGINGFACE_TOKEN = os.getenv('HUGGINGFACE_TOKEN')
 if not TELEGRAM_TOKEN or not HUGGINGFACE_TOKEN:
     raise ValueError("Укажи TELEGRAM_TOKEN и HUGGINGFACE_TOKEN в файле .env")
 
-API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2"
+# Используем runwayml/stable-diffusion-v1-5 - более стабильная модель
+API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
 
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
@@ -80,7 +81,7 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             error_msg = response.json() if response.headers.get('content-type') == 'application/json' else response.text
             await update.message.reply_text(
-                f"❌ Ошибка при создании картинки:\n{error_msg}\n\nПопробуй позже!"
+                f"❌ Ошибка при создании картинки:\n{error_msg}\n\nПопробуй позже или напиши другое описание!"
             )
     except requests.exceptions.Timeout:
         await update.message.reply_text(
@@ -101,7 +102,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_image))
     
-    logger.info("🚀 Бот запущен!")
+    logger.info("🚀 Бот запущен! Используется модель: runwayml/stable-diffusion-v1-5")
     app.run_polling()
 
 if __name__ == '__main__':
