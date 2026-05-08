@@ -1,4 +1,4 @@
-import os
+import os  # Исправлено: с маленькой буквы
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import requests
@@ -16,10 +16,13 @@ HUGGINGFACE_TOKEN = os.getenv('HUGGINGFACE_TOKEN')
 if not TELEGRAM_TOKEN or not HUGGINGFACE_TOKEN:
     raise ValueError("Укажи TELEGRAM_TOKEN и HUGGINGFACE_TOKEN в файле .env")
 
-# Используем runwayml/stable-diffusion-v1-5 - более стабильная модель
+# Используем runwayml/stable-diffusion-v1-5
 API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
 
-headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
+headers = {
+    "Authorization": f"Bearer {HUGGINGFACE_TOKEN}",
+    "Content-Type": "application/json"
+}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start"""
@@ -56,22 +59,26 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Описание слишком длинное! Максимум 500 символов.")
         return
     
-    # Отправляем уведомление
     processing_msg = await update.message.reply_text(
         f"🎨 Создаю картинку: '{user_prompt}'\n\n⏳ Подожди 30-60 секунд..."
     )
     
     try:
-        # Отправляем запрос к Hugging Face
+        # Добавляем wait_for_model, чтобы не ловить ошибку, пока модель грузится
+        payload = {
+            "inputs": user_prompt,
+            "options": {"wait_for_model": True}
+        }
+
         response = requests.post(
             API_URL,
             headers=headers,
-            json={"inputs": user_prompt},
+            json=payload,
             timeout=120
         )
         
-        if response.status_code == 200:
-            # Сохраняем картинку
+        # Проверяем, что нам пришла именно картинка, а не текст ошибки
+        if response.status_code == 200 and "image" in response.headers.get("Content-Type", ""):
             image_data = response.content
             await update.message.reply_photo(
                 photo=image_data,
@@ -79,13 +86,16 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             await processing_msg.delete()
         else:
-            error_msg = response.json() if response.headers.get('content-type') == 'application/json' else response.text
+            # Если пришел HTML или JSON с ошибкой
+            logger.error(f"API Error: {response.status_code} - {response.text[:200]}")
             await update.message.reply_text(
-                f"❌ Ошибка при создании картинки:\n{error_msg}\n\nПопробуй позже или напиши другое описание!"
+                "❌ Сервер Hugging Face временно недоступен или вернул ошибку.\n"
+                "Попробуй через минуту или используй другое описание."
             )
+            
     except requests.exceptions.Timeout:
         await update.message.reply_text(
-            "⏱️ Запрос занял слишком долго!\n\nПопробуй с более коротким описанием."
+            "⏱️ Запрос занял слишком много времени! Попробуй позже."
         )
     except Exception as e:
         logger.error(f"Ошибка: {e}")
@@ -97,12 +107,11 @@ def main():
     """Запуск бота"""
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
-    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, generate_image))
     
-    logger.info("🚀 Бот запущен! Используется модель: runwayml/stable-diffusion-v1-5")
+    logger.info("🚀 Бот запущен!")
     app.run_polling()
 
 if __name__ == '__main__':
